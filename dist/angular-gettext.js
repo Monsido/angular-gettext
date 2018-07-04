@@ -413,11 +413,6 @@ angular.module('gettext').directive('translate', ["gettextCatalog", "$parse", "$
     var msie = parseInt((/msie (\d+)/.exec(lowercase($window.navigator.userAgent)) || [])[1], 10);
     var PARAMS_PREFIX = 'translateParams';
     var PARAMS_HTML_PREFIX = 'translateHtmlParams';
-    /**
-     * A list of variables that allow the use of HTML
-     * @type {Array}
-     */
-    var allowedHtmlScopeVariables = [];
 
     function getCtxAttr(key) {
         return gettextUtil.lcFirst(key.replace(PARAMS_PREFIX, ''));
@@ -427,7 +422,7 @@ angular.module('gettext').directive('translate', ["gettextCatalog", "$parse", "$
         return gettextUtil.lcFirst(key.replace(PARAMS_HTML_PREFIX, ''));
     }
 
-    function handleInterpolationContext(scope, attrs, update) {
+    function handleInterpolationContext(scope, attrs, update, allowedHtmlScopeVariables) {
         // get normal attributes (translate-params-*)
         var attributes = Object.keys(attrs).filter(function (key) {
             return gettextUtil.startsWith(key, PARAMS_PREFIX) && key !== PARAMS_PREFIX;
@@ -439,7 +434,7 @@ angular.module('gettext').directive('translate', ["gettextCatalog", "$parse", "$
         });
 
         // reset allowedHtmlScopeVariables
-        allowedHtmlScopeVariables = [];
+        allowedHtmlScopeVariables.length = 0;
 
         if (!attributes.length && !htmlAttributes.length) {
             return null;
@@ -483,6 +478,12 @@ angular.module('gettext').directive('translate', ["gettextCatalog", "$parse", "$
             // Validate attributes
             gettextUtil.assert(!attrs.translatePlural || attrs.translateN, 'translate-n', 'translate-plural');
             gettextUtil.assert(!attrs.translateN || attrs.translatePlural, 'translate-plural', 'translate-n');
+
+            /**
+             * A list of variables that allow the use of HTML
+             * @type {Array}
+             */
+            var allowedHtmlScopeVariables = [];
 
             var msgid = gettextUtil.trim(element.html());
             var translatePlural = attrs.translatePlural;
@@ -529,10 +530,11 @@ angular.module('gettext').directive('translate', ["gettextCatalog", "$parse", "$
                             return;
                         }
 
-                        // add a way to handle ng-bind-html with a regex looking for %(variable)s or %(variable)x
+                        // add a way to handle ng-bind-html with a regex looking for {{ variable }}
                         var regex = new RegExp(/\{\{\s*(.*?)?\s*\}\}/g);
 
                         translated = translated.replace(regex, function replacer(match, p1) {
+                            // make sure this variable has been defined in the interpolation scope
                             if (allowedHtmlScopeVariables.indexOf(p1) >= 0) {
                                 return $interpolate('{{ ' + p1 +  ' }}')(interpolationContext);
                             }
@@ -549,7 +551,7 @@ angular.module('gettext').directive('translate', ["gettextCatalog", "$parse", "$
                         $animate.leave(oldContents);
                     }
 
-                    var interpolationContext = handleInterpolationContext(scope, attrs, update);
+                    var interpolationContext = handleInterpolationContext(scope, attrs, update, allowedHtmlScopeVariables);
                     update(interpolationContext);
                     linking = false;
 
